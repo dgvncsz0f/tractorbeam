@@ -23,8 +23,8 @@ discover these machines (suppose you run this on every single one):
                 -- --fqdn
 
 The above command would execute `hostname` command once a second
-(*--delay* switch) then report the output on node given by the
-*--path* switch.
+(`--delay` switch) then report the output on node given by the
+`--path` switch.
 
 ## OPTIONS ##
 
@@ -39,8 +39,7 @@ The above command would execute `hostname` command once a second
     The path of the node you want to create on zookeeper. Notice all
     the parents must exist and you must have write permissions.
 
-    The node that gets created is *ephemeral* and have
-    *OPEN_USAFE_ACL*;
+    The node is *ephemeral* and have *OPEN_UNSAFE* acl;
 
   * `--exec` FILE:
 
