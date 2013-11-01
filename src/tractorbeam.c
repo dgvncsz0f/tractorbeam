@@ -116,7 +116,7 @@ void __tractorbeam_print_usage(const char *prg)
   snprintf(buffer, 1024, "The path of the ephemeral node you want to create [mandatory]");
   __printf_indent("  --path STRING       ", buffer, 76);
 
-  snprintf(buffer, 1024, "The program to invoke. This should be the an absolute path (but it is"
+  snprintf(buffer, 1024, "The image to invoke. This should be the an absolute path (but it is"
                          "not enforced) [mandatory]");
   __printf_indent("  --exec FILE         ", buffer, 76);
 

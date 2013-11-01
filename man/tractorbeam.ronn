@@ -49,10 +49,10 @@ The above command would execute `hostname` command once a second
     gets killed and the node on zookeeper is removed.
 
     The data you want to write on zookeeper should be written on
-    *stdout*. *stdin* and *stderr* are redirected to */dev/null*.
+    *stdout* and *stdin* and *stderr* are redirected to */dev/null*.
 
-    If this process exists 0 the zookeeper node gets either created or
-    updates. Anything other than 0 deletes the zookeeper node;
+    If this process *exists 0* the zookeeper node gets either created
+    or updated. Anything else deletes the node;
 
   * `--delay-in-s` INT:
 
