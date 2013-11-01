@@ -110,13 +110,7 @@ void __tractorbeam_print_usage(const char *prg)
   __printf_indent("", "  This program connects to a zookeeper cluster and regularly writes"
                       "  the output of a given program into a ephemeral node.", 60);
 
-  snprintf(buffer, 1024, "The zookeeper cluster to connect to."
-                         " You may provide multiple hosts separated by commas."
-                         " At the end of the string, you may also supply an optional"
-                         " chroot. [default:%s]"
-                         "  \n \n Examples:"
-                         " \n \t* `localhost:2181,localhost:2182';"
-                         " \n \t* `localhost:2181,localhost:2182/tractorbeam';", TB_DEFAULT_ENDPOINT);
+  snprintf(buffer, 1024, "The zookeeper cluster to connect to [default: %s].", TB_DEFAULT_ENDPOINT);
   __printf_indent("  --zookeeper STRING  ", buffer, 76);
 
   snprintf(buffer, 1024, "The path of the ephemeral node you want to create [mandatory]");
