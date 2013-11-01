@@ -63,13 +63,27 @@ tractorbeam_monitor_t *tractorbeam_monitor_init(const char *zk_endpoint, const c
  *
  * \return 0: success;
  *
- * \return 1: concurrency error, you should try this again;
+ * \return 1: you must retry the operation (an stale ephemeral node has been deleted, for instance);
  *
  * \return -2: could not create/update the znode;
  *
  * \return -1: error;
  */
 int tractorbeam_monitor_update(tractorbeam_monitor_t *, const void *data, size_t datasize);
+
+/*! Dumps a zookeeper tree into the filesystem.
+ *
+ * Note to users: this function installs no watchers whatsoever and
+ * it writes to files are not atomic.
+ *
+ * If you deman an atomic operation, you probably should create an
+ * empty directory, call this function and then atomically update the
+ * directory. Obviously, another option is to use some sort of
+ * barrier, if applicable.
+ *
+ * \param path The directory you want to dump the three.
+ */
+int tractorbeam_monitor_snapshot(tractorbeam_monitor_t *, const char *path);
 
 /*! Deletes the znode from zookeeper;
  *
@@ -82,6 +96,7 @@ int tractorbeam_monitor_delete(tractorbeam_monitor_t *);
 /*! Free all resources used by this monitor.
  *
  * \return 0: success;
+ * 
  * \return -1: failure;
  */
 int tractorbeam_monitor_term(tractorbeam_monitor_t *);

@@ -110,25 +110,24 @@ void __tractorbeam_print_usage(const char *prg)
   __printf_indent("", "  This program connects to a zookeeper cluster and regularly writes"
                       "  the output of a given program into a ephemeral node.", 60);
 
-  snprintf(buffer, 1024, "The zookeeper cluster to connect to [default: %s].", TB_DEFAULT_ENDPOINT);
+  snprintf(buffer, 1024, "The zookeeper cluster to connect to [default:%s];", TB_DEFAULT_ENDPOINT);
   __printf_indent("  --zookeeper STRING  ", buffer, 76);
 
-  snprintf(buffer, 1024, "The path of the ephemeral node you want to create [mandatory]");
+  snprintf(buffer, 1024, "The path of the ephemeral node you want to create;");
   __printf_indent("  --path STRING       ", buffer, 76);
 
   snprintf(buffer, 1024, "The image to invoke. This should be the an absolute path (but it is"
-                         "not enforced) [mandatory]");
+                         " not enforced);");
   __printf_indent("  --exec FILE         ", buffer, 76);
 
   snprintf(buffer, 1024, "Defines the interval at which the program gets called. The amount of"
                          " time the program spent during its thing is not taken into account,"
-                         " but the runtime may not exceed this value. [default:%d]", TB_DEFAULT_DELAY);
-  __printf_indent("  --delay-in-s INT    ", buffer, 76);
+                         " but the runtime may not exceed this value [default:%d];", TB_DEFAULT_DELAY);
+  __printf_indent("  --delay SECONDS     ", buffer, 76);
 
-  snprintf(buffer, 1024, "Timeout in milliseconds. This defines how much time without"
-                         " communication zookeeper should consider the client still alive."
-                         " [default:%d]", TB_DEFAULT_TIMEOUT);
-  __printf_indent("  --timeout-in-ms INT ", buffer, 76);
+  snprintf(buffer, 1024, "This defines how much time without communication zookeeper should"
+                         " consider the client still alive [default:%d];", TB_DEFAULT_TIMEOUT);
+  __printf_indent("  --timeout MILLISECS ", buffer, 76);
 
 }
 
@@ -146,8 +145,8 @@ int main(int argc, char *argv[])
     {"zookeeper",     required_argument, NULL, 0 },
     {"path",          required_argument, NULL, 0 },
     {"exec",          required_argument, NULL, 0 },
-    {"timeout-in-ms", required_argument, NULL, 0 },
-    {"delay-in-s",    required_argument, NULL, 0 },
+    {"timeout",       required_argument, NULL, 0 },
+    {"delay",         required_argument, NULL, 0 },
     {"help",          no_argument,       NULL, 0 },
     {0,               0,                 NULL, 0 }
   };

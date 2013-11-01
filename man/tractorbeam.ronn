@@ -17,13 +17,13 @@ several different machines. The the following would allow you to
 discover these machines (suppose you run this on every single one):
 
     tractorbeam --zookeeper my-zk-cluster:2181 \
-                --delay-in-s 1 \
+                --delay 1 \
                 --path /my/service/$(uuid) \
                 --exec /usr/bin/hostname \
                 -- --fqdn
 
 The above command would execute `hostname` command once a second
-(*--delay-in-sec* switch) then report the output on node given by the
+(*--delay* switch) then report the output on node given by the
 *--path* switch.
 
 ## OPTIONS ##
@@ -45,7 +45,7 @@ The above command would execute `hostname` command once a second
   * `--exec` FILE:
 
     The image you want to execute. This must be an absolute path. This
-    program must terminate faster than `--delay-in-s` otherwise it
+    program must terminate faster than `--delay` otherwise it
     gets killed and the node on zookeeper is removed.
 
     The data you want to write on zookeeper should be written on
@@ -55,13 +55,13 @@ The above command would execute `hostname` command once a second
     If this process *exists 0* the zookeeper node gets either created
     or updated. Anything else deletes the node;
 
-  * `--delay-in-s` INT:
+  * `--delay` SECONDS:
 
     The interval at which the `--exec` program gets invoked (the time
     spent running the process is not taken into account). This value
     also defines the timeout for the process to terminate.
 
-  * `--timeout-in-ms` INT:
+  * `--timeout` MILLISECS:
 
     The timeout option to use when connecting zookeeper. This informs
     zookeeper to keep the ephemeral this long before deleting in the
@@ -78,3 +78,7 @@ Written by dgvncsz0f
 ## COPYRIGHT ##
 
 Copyright (c) 2013 Diego Souza. License BSD.
+
+## TODO ##
+
+  * Sign the contents of the mode;
