@@ -32,7 +32,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include "tractorbeam/debug.h"
-#include "tractorbeam/tbloop.h"
+#include "tractorbeam/zksend.h"
 #include "tractorbeam/helpers.h"
 #include "tractorbeam/monitor.h"
 
@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
   if (__tractorbeam_check(&optvals) != 0)
   { return(1); }
 
-  int rc = tractorbeam_loop(&optvals);
+  int rc = tractorbeam_zksend(&optvals);
   free(optvals.argv);
   return(rc);
 }
