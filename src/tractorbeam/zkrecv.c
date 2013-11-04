@@ -25,21 +25,49 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef __tractorbeam_zksend_h__
-#define __tractorbeam_zksend_h__
+#include <stdio.h>
+#include <string.h>
+#include "tractorbeam/debug.h"
+#include "tractorbeam/zkrecv.h"
+#include "tractorbeam/monitor.h"
 
-typedef struct
+static
+int __tbzkrcv_inicc_raw(tb_snapshot_events event, const char *ppath, const char *name, const void *contents, size_t contsize, void *data)
 {
-  char *endpoint;
-  char *path;
-  char *exec;
-  char **argv;
-  int delay;
-  int timeout;
-} tractorbeam_zksend_t;
+  char buffer[22];
+  if (event == DONE)
+  { return(0); }
+  else if (event != ITEM)
+  { return(-1); }
 
-/*! Executes the tractorbeam send loop (this function never returns).
- */
-int tractorbeam_zksend(tractorbeam_zksend_t *);
+  int rc = snprintf(buffer, 22, "%zd\n", contsize);
+  if (rc <= 0)
+  { return(-1); }
+  if (rc >= 22)
+  { return(-1); }
 
-#endif
+  FILE *file = (FILE *) data;
+  if (fwrite(ppath, strlen(ppath), 1, file)>0 && 
+      fwrite("/", 1, 1, file)>0 &&
+      fwrite(name, strlen(name), 1, file)>0 &&
+      fwrite("|", 1, 1, file)>0 &&
+      fwrite(buffer, rc, 1, file)>0 &&
+      fwrite(contents, contsize, 1, file)>0 &&
+      fwrite("\n", 1, 1, file)>0)
+  { return(0); }
+  return(-1);
+}
+
+int tractorbeam_zkrecv(tractorbeam_zkrecv_t *info)
+{
+  tractorbeam_monitor_t *mh = tractorbeam_monitor_init(info->endpoint, info->path, info->timeout);
+  if (mh == NULL)
+  {
+    TB_DEBUG0("error connecting to zookeeper");
+    return(-1);
+  }
+
+  int rc  = tractorbeam_monitor_snapshot(mh, info->path, __tbzkrcv_inicc_raw, info->file);
+  tractorbeam_monitor_term(mh);
+  return(rc);
+}

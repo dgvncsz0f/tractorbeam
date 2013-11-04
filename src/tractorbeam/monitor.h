@@ -28,7 +28,40 @@
 #ifndef __tractorbeam_monitor_h__
 #define __tractorbeam_monitor_h__
 
+#include <stdlib.h>
+
 typedef struct tractorbeam_monitor_t tractorbeam_monitor_t;
+
+typedef enum
+{
+  ITEM,
+  DONE,
+  FAIL
+} tb_snapshot_events;
+
+/*! tractorbeam_monitor_snapshot callback.
+ *
+ * This function gets called for every node found in along the
+ * requested path.
+ *
+ * \param event The event that has ocurred. DONE or FAIL means the
+ *              function has terminated wither successfuly or not
+ *              respectively;
+ * 
+ * \param ppath The (absolute) path of the parent node. This is NULL
+ *              when event is DONE or FAIL;
+ *
+ * \param name The name of the current node. ppath + / + name creates
+ *             the absolute path of the curret node;
+ *
+ * \param contents The contents of the node (might be NULL);
+ *
+ * param contsize The size of the data pointer (0 if data is NULL);
+ * 
+ * \return 0: continue;
+ *         else: aborts the function;
+ */
+typedef int (*tb_snapshot_fn)(tb_snapshot_events event, const char *ppath, const char *name, const void *contents, size_t contsize, void *data);
 
 /*! Initialize the monitor.
  *
@@ -71,19 +104,9 @@ tractorbeam_monitor_t *tractorbeam_monitor_init(const char *zk_endpoint, const c
  */
 int tractorbeam_monitor_update(tractorbeam_monitor_t *, const void *data, size_t datasize);
 
-/*! Dumps a zookeeper tree into the filesystem.
- *
- * Note to users: this function installs no watchers whatsoever and
- * it writes to files are not atomic.
- *
- * If you deman an atomic operation, you probably should create an
- * empty directory, call this function and then atomically update the
- * directory. Obviously, another option is to use some sort of
- * barrier, if applicable.
- *
- * \param path The directory you want to dump the three.
+/*! Walks a given zookeeper tree.
  */
-int tractorbeam_monitor_snapshot(tractorbeam_monitor_t *, const char *path);
+int tractorbeam_monitor_snapshot(tractorbeam_monitor_t *, const char *path, tb_snapshot_fn callback, void *data);
 
 /*! Deletes the znode from zookeeper;
  *

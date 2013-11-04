@@ -25,21 +25,22 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef __tractorbeam_zksend_h__
-#define __tractorbeam_zksend_h__
+#ifndef __tractorbeam_zkrecv_h__
+#define __tractorbeam_zkrecv_h__
+
+#include "tractorbeam/monitor.h"
 
 typedef struct
 {
   char *endpoint;
   char *path;
-  char *exec;
-  char **argv;
+  FILE *file;
   int delay;
   int timeout;
-} tractorbeam_zksend_t;
+} tractorbeam_zkrecv_t;
 
-/*! Executes the tractorbeam send loop (this function never returns).
+/*! Reads a tree from zookeeper
  */
-int tractorbeam_zksend(tractorbeam_zksend_t *);
+int tractorbeam_zkrecv(tractorbeam_zkrecv_t *);
 
 #endif

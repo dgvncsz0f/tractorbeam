@@ -32,6 +32,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include "tractorbeam/debug.h"
+#include "tractorbeam/zkrecv.h"
 #include "tractorbeam/zksend.h"
 #include "tractorbeam/helpers.h"
 #include "tractorbeam/monitor.h"
@@ -39,30 +40,31 @@
 #define TB_DEFAULT_ENDPOINT "localhost:2181"
 #define TB_DEFAULT_TIMEOUT 5000
 #define TB_DEFAULT_DELAY 5
+#define TB_RECV_BUFSIZE 2097152
 
 static
-int __tractorbeam_check(tractorbeam_runtime_t *optval)
+int __tractorbeam_check_send(tractorbeam_zksend_t *sendcfg)
 {
   int rc = 0;
-  if (optval->endpoint == NULL || strcmp("", optval->endpoint) == 0)
+  if (sendcfg->endpoint == NULL || strcmp("", sendcfg->endpoint) == 0)
   {
     printf("ERROR: zookeeper must not be null\n");
     rc = 1;
   }
 
-  if (optval->path == NULL || strcmp("", optval->path) == 0)
+  if (sendcfg->path == NULL || strcmp("", sendcfg->path) == 0)
   {
     printf("ERROR: path must not be null\n");
     rc = 1;
   }
 
-  if (optval->exec == NULL || strcmp("", optval->exec) == 0)
+  if (sendcfg->exec == NULL || strcmp("", sendcfg->exec) == 0)
   {
     printf("ERROR: exec must not be null\n");
     rc = 1;
   }
 
-  if (optval->timeout <= 0)
+  if (sendcfg->timeout <= 0)
   {
     printf("ERROR: timeout must be >0\n");
     rc = 1;
@@ -72,12 +74,44 @@ int __tractorbeam_check(tractorbeam_runtime_t *optval)
 }
 
 static
+int __tractorbeam_check_recv(tractorbeam_zkrecv_t *recvcfg)
+{
+  int rc = 0;
+
+  if (recvcfg->path == NULL || strcmp("", recvcfg->path) == 0)
+  {
+    printf("ERROR: path must not be null\n");
+    rc = 1;
+  }
+
+  return(rc);
+}
+
+static
+size_t __tractorbeam_strlen1(const char *s)
+{
+  size_t maxlen = 0;
+  size_t curlen = 0;
+  for (; s[0] != '\0'; s++)
+  {
+    curlen += 1;
+    if (s[0] == '\n')
+    {
+      maxlen = (curlen > maxlen) ? curlen : maxlen;
+      curlen = 0;
+    }
+  }
+
+  return(curlen > maxlen ? curlen : maxlen);
+}
+
+static
 void __printf_indent(const char *a, const char *b, size_t maxlen)
 {
   char *tmp     = strdup(b);
   char *delim   = " ";
   char *token   = NULL;
-  size_t prefix = strlen(a);
+  size_t prefix = __tractorbeam_strlen1(a);
   size_t at     = 0;
 
   printf("\n%s", a);
@@ -102,10 +136,17 @@ void __printf_indent(const char *a, const char *b, size_t maxlen)
 }
 
 static
-void __tractorbeam_print_usage(const char *prg)
+void __tractorbeam_print_usage0(const char *prg)
+{
+  printf("USAGE: %s {send,recv} OPTIONS...\n\n", prg);
+  printf("  tip: use --help after the sub-comamnd to get a list of available options\n");
+}
+
+static
+void __tractorbeam_print_sendusage(const char *prg)
 {
   char buffer[1024];
-  printf("USAGE: %s OPTIONS... -- [ARGV...]\n", prg);
+  printf("USAGE: %s send OPTIONS... -- [ARGV...]\n", prg);
 
   __printf_indent("", "  This program connects to a zookeeper cluster and regularly writes"
                       "  the output of a given program into a ephemeral node.", 60);
@@ -131,17 +172,70 @@ void __tractorbeam_print_usage(const char *prg)
 
 }
 
-int main(int argc, char *argv[])
+static
+void __tractorbeam_print_recvusage(const char *prg)
 {
-  tractorbeam_runtime_t optvals;
-  optvals.endpoint  = TB_DEFAULT_ENDPOINT;
-  optvals.path      = "";
-  optvals.exec      = "";
-  optvals.argv      = NULL;
-  optvals.delay     = TB_DEFAULT_DELAY;
-  optvals.timeout   = TB_DEFAULT_TIMEOUT;
+  char buffer[1024];
+  printf("USAGE: %s recv OPTIONS...\n", prg);
 
-  static struct option tb_options[] = {
+  __printf_indent("", "  This program connects to a zookeeper cluster and reads its"
+                      "  entire tree allowing the user to dump the contents in many"
+                      "  different formats.", 60);
+
+  snprintf(buffer, 1024, "The zookeeper cluster to connect to [default:%s];", TB_DEFAULT_ENDPOINT);
+  __printf_indent("  --zookeeper STRING  ", buffer, 76);
+
+  snprintf(buffer, 1024, "The tree you want to read;");
+  __printf_indent("  --path STRING       ", buffer, 76);
+
+  snprintf(buffer, 1024, "The file to write the contents. Use - to write into the stdout [default:-];");
+  __printf_indent("  --output FILE       ", buffer, 76);
+}
+
+static
+int __tractorbeam_parse_recvopts(int argc, char *argv[], tractorbeam_zkrecv_t *recvcfg)
+{
+  static struct option my_options[] = {
+    {"zookeeper",     required_argument, NULL, 0 },
+    {"path",          required_argument, NULL, 0 },
+    {"output",        required_argument, NULL, 0 },
+    {"help",          no_argument,       NULL, 0 },
+    {0,               0,                 NULL, 0 }
+  };
+
+  while (1)
+  {
+    int opt = 0;
+    int rc  = getopt_long_only(argc, argv, "", my_options, &opt);
+    if (rc == -1)
+    { break; }
+    else if (rc == 0)
+    {
+      if (opt == 0)
+      { recvcfg->endpoint = optarg; }
+      else if (opt == 1)
+      { recvcfg->path = optarg; }
+      else if (opt == 2)
+      {
+        if (strcmp(optarg, "-") == 0)
+        { recvcfg->file = stdout; }
+        else
+        { recvcfg->file = fopen(optarg, "w"); }
+      }
+      else
+      { return(-1); }
+    }
+    else
+    { return(-1); }
+  }
+
+  return(__tractorbeam_check_recv(recvcfg));
+}
+
+static
+int __tractorbeam_parse_sendopts(int argc, char *argv[], tractorbeam_zksend_t *sendcfg)
+{
+  static struct option my_options[] = {
     {"zookeeper",     required_argument, NULL, 0 },
     {"path",          required_argument, NULL, 0 },
     {"exec",          required_argument, NULL, 0 },
@@ -154,45 +248,90 @@ int main(int argc, char *argv[])
   while (1)
   {
     int opt = 0;
-    int rc  = getopt_long_only(argc, argv, "", tb_options, &opt);
+    int rc  = getopt_long_only(argc, argv, "", my_options, &opt);
     if (rc == -1)
     { break; }
     else if (rc == 0)
     {
       if (opt == 0)
-      { optvals.endpoint = optarg; }
+      { sendcfg->endpoint = optarg; }
       else if (opt == 1)
-      { optvals.path = optarg; }
+      { sendcfg->path = optarg; }
       else if (opt == 2)
-      { optvals.exec = optarg; }
+      { sendcfg->exec = optarg; }
       else if (opt == 3)
-      { optvals.timeout = atoi(optarg); }
+      { sendcfg->timeout = atoi(optarg); }
       else if (opt == 4)
-      { optvals.delay = atoi(optarg); }
+      { sendcfg->delay = atoi(optarg); }
       else
-      {
-        __tractorbeam_print_usage(argv[0]);
-        return(0);
-      }
+      { return(-1); }
     }
     else
-    {
-      __tractorbeam_print_usage(argv[0]);
-      return(-1);
-    }
+    { return(-1); }
   }
 
-  int k           = optind;
-  optvals.argv    = (char **) malloc(sizeof(char*) * (2 + (argc - optind)));
-  optvals.argv[0] = optvals.exec;
+  int k            = optind;
+  sendcfg->argv    = (char **) malloc(sizeof(char*) * (2 + (argc - optind)));
+  sendcfg->argv[0] = sendcfg->exec;
   for (; k<argc; k+=1)
-  { optvals.argv[1+k-optind] = argv[k]; }
-  optvals.argv[1+k-optind] = NULL;
+  { sendcfg->argv[1+k-optind] = argv[k]; }
+  sendcfg->argv[1+k-optind] = NULL;
 
-  if (__tractorbeam_check(&optvals) != 0)
-  { return(1); }
+  return(__tractorbeam_check_send(sendcfg));
+}
 
-  int rc = tractorbeam_zksend(&optvals);
-  free(optvals.argv);
-  return(rc);
+int main(int argc, char *argv[])
+{
+  tractorbeam_zksend_t sendcfg;
+  sendcfg.endpoint  = TB_DEFAULT_ENDPOINT;
+  sendcfg.path      = "";
+  sendcfg.exec      = "";
+  sendcfg.argv      = NULL;
+  sendcfg.delay     = TB_DEFAULT_DELAY;
+  sendcfg.timeout   = TB_DEFAULT_TIMEOUT;
+
+  tractorbeam_zkrecv_t recvcfg;
+  recvcfg.endpoint  = TB_DEFAULT_ENDPOINT;
+  recvcfg.path      = "";
+  recvcfg.file      = stdout;
+  recvcfg.delay     = TB_DEFAULT_DELAY;
+  recvcfg.timeout   = TB_DEFAULT_TIMEOUT;
+
+  if (argc < 2)
+  {
+    __tractorbeam_print_usage0(argv[0]);
+    return(-1);
+  }
+
+  if (strcmp(argv[1], "send") == 0)
+  {
+    argv[1] = argv[0];
+    if (__tractorbeam_parse_sendopts(argc-1, argv+1, &sendcfg) != 0)
+    {
+      __tractorbeam_print_sendusage(argv[0]);
+      return(-1);
+    }
+
+    int rc = tractorbeam_zksend(&sendcfg);
+    free(sendcfg.argv);
+    return(rc);
+  }
+  else if (strcmp(argv[1], "recv") == 0)
+  {
+    argv[1] = argv[0];
+    if (__tractorbeam_parse_recvopts(argc-1, argv+1, &recvcfg) != 0)
+    {
+      __tractorbeam_print_recvusage(argv[0]);
+      return(-1);
+    }
+
+    return(tractorbeam_zkrecv(&recvcfg));
+  }
+  else
+  {
+    __tractorbeam_print_usage0(argv[0]);
+    return(-1);
+  }
+
+  return(-1);
 }

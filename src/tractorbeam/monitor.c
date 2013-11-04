@@ -28,6 +28,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <zookeeper/zookeeper.h>
+#include "tractorbeam/debug.h"
 #include "tractorbeam/helpers.h"
 #include "tractorbeam/monitor.h"
 
@@ -41,7 +42,30 @@ struct tractorbeam_monitor_t
 };
 
 static
-void __monitor_reconnect(tractorbeam_monitor_t *mh, watcher_fn fn)
+char *__tbm_path(const char *parent, const char *name)
+{
+  size_t offset = strlen(parent);
+  size_t psize  = offset + 1 + strlen(name);
+  char *path = (char *) malloc(psize + 1);
+  if (path != NULL)
+  {
+    strncpy(path, parent, offset);
+    if (psize > offset+1)
+    {
+      strncpy(path+offset, "/", 1);
+      strcpy(path+offset+1, name);
+      path[psize] = '\0';
+    }
+    else
+    { path[offset] = '\0'; }
+  }
+  TB_DEBUG("%s+%s => %s", parent, name, path);
+
+  return(path);
+}
+
+static
+void __tbm_reconnect(tractorbeam_monitor_t *mh, watcher_fn fn)
 {
   if (pthread_mutex_lock(&mh->mutex) != 0)
   { return; }
@@ -54,7 +78,7 @@ void __monitor_reconnect(tractorbeam_monitor_t *mh, watcher_fn fn)
 }
 
 static
-void __monitor_watcher(zhandle_t *zh, int type, int state, const char *path, void *ctx)
+void __tbm_watcher(zhandle_t *zh, int type, int state, const char *path, void *ctx)
 {
   UNUSED(zh);
   UNUSED(path);
@@ -63,12 +87,12 @@ void __monitor_watcher(zhandle_t *zh, int type, int state, const char *path, voi
   if (type == ZOO_SESSION_EVENT)
   {
     if (state == ZOO_EXPIRED_SESSION_STATE)
-    { __monitor_reconnect(mh, __monitor_watcher); }
+    { __tbm_reconnect(mh, __tbm_watcher); }
   }
 }
 
 static
-int __monitor_zkcreate(tractorbeam_monitor_t *mh, const void *data, size_t datasize)
+int __tbm_zkcreate(tractorbeam_monitor_t *mh, const void *data, size_t datasize)
 {
   int rc = zoo_create(mh->zh, mh->znode, data, datasize, &ZOO_OPEN_ACL_UNSAFE, ZOO_EPHEMERAL, NULL, 0);
   if (rc == ZNODEEXISTS)
@@ -82,7 +106,7 @@ int __monitor_zkcreate(tractorbeam_monitor_t *mh, const void *data, size_t datas
 }
 
 static
-int __monitor_zkupdate(tractorbeam_monitor_t *mh, struct Stat *stat, const void *data, size_t datasize)
+int __tbm_zkupdate(tractorbeam_monitor_t *mh, struct Stat *stat, const void *data, size_t datasize)
 {
   int rc = zoo_set(mh->zh, mh->znode, data, datasize, stat->version);
   if (rc == ZNONODE || rc == ZBADVERSION)
@@ -94,7 +118,7 @@ int __monitor_zkupdate(tractorbeam_monitor_t *mh, struct Stat *stat, const void 
 }
 
 static
-int __monitor_zkcheck(tractorbeam_monitor_t *mh, struct Stat *stat)
+int __tbm_zkcheck(tractorbeam_monitor_t *mh, struct Stat *stat)
 {
   const clientid_t *client = zoo_client_id(mh->zh);
   if (client == NULL)
@@ -110,6 +134,60 @@ int __monitor_zkcheck(tractorbeam_monitor_t *mh, struct Stat *stat)
   }
   else
   { return(0); }
+}
+
+static
+int __tbm_snapshot(tractorbeam_monitor_t *mh, const char *ppath, const char *name, int *status, char *buffer, size_t bufsize, tb_snapshot_fn callback, void *data)
+{
+  struct String_vector children;
+  int rc, zrc;
+  char *path = __tbm_path(ppath, name);
+  if (path == NULL)
+  { return(-1); }
+
+  rc  = -1;
+  zrc = zoo_get_children(mh->zh, path, 0, &children);
+  if (zrc != ZOK)
+  {
+    TB_DEBUG("error listing children of: %s", path);
+    goto handle_error;
+  }
+
+  for (int k=0; k<children.count; k+=1)
+  {
+    rc            = -1;
+    char *child   = __tbm_path(path, children.data[k]);
+    int r_bufsize = (int) bufsize;
+    int zrc       = zoo_get(mh->zh, child, 0, buffer, &r_bufsize, NULL);
+    free(child);
+    if (zrc != ZOK)
+    {
+      TB_DEBUG("error retrieving contents of: %s/%s", path, children.data[k]);
+      goto handle_error;
+    }
+
+    rc      = -2;
+    *status = callback(ITEM, path, children.data[k], buffer, (size_t) r_bufsize, data);
+    if (*status != 0)
+    {
+      TB_DEBUG("callback has failed: %s/%s/%d", path, children.data[k], *status);
+      goto handle_error;
+    }
+  }
+
+  for (int k=0; k<children.count; k+=1)
+  {
+    rc = __tbm_snapshot(mh, path, children.data[k], status, buffer, bufsize, callback, data);
+    if (rc != 0)
+    { goto handle_error; }
+  }
+
+  free(path);
+  return(0);
+
+handle_error:
+  free(path);
+  return(-1);
 }
 
 tractorbeam_monitor_t *tractorbeam_monitor_init(const char *endpoint, const char *znode, int timeout_in_ms)
@@ -137,7 +215,7 @@ tractorbeam_monitor_t *tractorbeam_monitor_init(const char *endpoint, const char
   if (mh->endpoint == NULL)
   { goto handle_error; }
 
-  __monitor_reconnect(mh, __monitor_watcher);
+  __tbm_reconnect(mh, __tbm_watcher);
   return(mh);
 
 handle_error:
@@ -159,12 +237,12 @@ int tractorbeam_monitor_update(tractorbeam_monitor_t *mh, const void *data, size
   {
     rc = zoo_exists(mh->zh, mh->znode, 0, &stat);
     if (rc == ZNONODE)
-    { code = __monitor_zkcreate(mh, data, datasize); }
+    { code = __tbm_zkcreate(mh, data, datasize); }
     else if (rc == ZOK)
     {
-      code = __monitor_zkcheck(mh, &stat);
+      code = __tbm_zkcheck(mh, &stat);
       if (code == 0)
-      { code = __monitor_zkupdate(mh, &stat, data, datasize); }
+      { code = __tbm_zkupdate(mh, &stat, data, datasize); }
     }
     else
     { code = -1; }
@@ -173,6 +251,23 @@ int tractorbeam_monitor_update(tractorbeam_monitor_t *mh, const void *data, size
   pthread_mutex_unlock(&mh->mutex);
 
   return(code);
+}
+
+int tractorbeam_monitor_snapshot(tractorbeam_monitor_t *mh, const char *path, tb_snapshot_fn callback, void *data)
+{
+  if (pthread_mutex_lock(&mh->mutex) != 0)
+  { return(-1); }
+
+  int status;
+  char buffer[1048576];
+  int rc = __tbm_snapshot(mh, path, "", &status, buffer, 1048576, callback, data);
+  if (rc == 0)
+  { status = callback(DONE, path, "", NULL, 0, data); }
+  else if (rc == -1)
+  { status = callback(FAIL, path, "", NULL, 0, data); }
+
+  pthread_mutex_unlock(&mh->mutex);
+  return(status);
 }
 
 int tractorbeam_monitor_delete(tractorbeam_monitor_t *mh)

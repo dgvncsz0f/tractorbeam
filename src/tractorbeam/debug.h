@@ -28,6 +28,10 @@
 #ifndef __tractorbeam_debug_h__
 #define __tractorbeam_debug_h__
 
+#define TB_DEBUG0(fmt) tractorbeam_debug("%s:%d: " #fmt , __FILE__, __LINE__)
+
+#define TB_DEBUG(fmt, ...) tractorbeam_debug("%s:%d: " #fmt , __FILE__, __LINE__, __VA_ARGS__)
+
 void tractorbeam_debug(const char *fmt, ...);
 
 #endif

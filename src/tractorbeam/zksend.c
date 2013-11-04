@@ -34,10 +34,10 @@
 #include "tractorbeam/zksend.h"
 #include "tractorbeam/monitor.h"
 
-#define TBLOOP_BUFSIZE 1048576
+#define ZKSEND_BUFSIZE 1048576
 
 static
-void __tbloop_debug_rt(tractorbeam_runtime_t *rt)
+void __zksend_debug_rt(tractorbeam_zksend_t *rt)
 {
   char buffer[4096];
   char **argv  = rt->argv + 1;
@@ -49,40 +49,40 @@ void __tbloop_debug_rt(tractorbeam_runtime_t *rt)
     offset += snprintf(buffer+offset, limit-offset, " %s", argv[0]);
     argv    = argv + 1;
   }
-  tractorbeam_debug("using: %s", buffer);
+  TB_DEBUG("using: %s", buffer);
 }
 
-int tractorbeam_zksend(tractorbeam_runtime_t *rt)
+int tractorbeam_zksend(tractorbeam_zksend_t *rt)
 {
-  char buffer[TBLOOP_BUFSIZE];
+  char buffer[ZKSEND_BUFSIZE];
   int status;
 
-  __tbloop_debug_rt(rt);
+  __zksend_debug_rt(rt);
   tractorbeam_monitor_t *mh = tractorbeam_monitor_init(rt->endpoint, rt->path, rt->timeout);
   if (mh == NULL)
   {
-    tractorbeam_debug("error connecting to zookeeper");
+    TB_DEBUG0("error connecting to zookeeper");
     return(-1);
   }
 
   do
   {
-    int rc = tractorbeam_exec(rt->exec, rt->argv, rt->delay, &status, buffer, TBLOOP_BUFSIZE);
+    int rc = tractorbeam_exec(rt->exec, rt->argv, rt->delay, &status, buffer, ZKSEND_BUFSIZE);
     if (rc == -2)
     {
-      tractorbeam_debug("%s: timeout; [removing node]", rt->exec);
+      TB_DEBUG("%s: timeout; [removing node]", rt->exec);
       tractorbeam_monitor_delete(mh);
     }
     else if (rc == -3)
     {
-      tractorbeam_debug("%s: output too large; [removing node]", rt->exec);
+      TB_DEBUG("%s: output too large; [removing node]", rt->exec);
       tractorbeam_monitor_delete(mh);
     }
     else if (rc >= 0)
     {
       if (status != 0)
       {
-        tractorbeam_debug("%s: exit code == %d; [removing node]", rt->exec, status);
+        TB_DEBUG("%s: exit code == %d; [removing node]", rt->exec, status);
         tractorbeam_monitor_delete(mh);
       }
       else
@@ -90,7 +90,7 @@ int tractorbeam_zksend(tractorbeam_runtime_t *rt)
     }
     else
     {
-      tractorbeam_debug("%s: error running; [removing node]", rt->exec);
+      TB_DEBUG("%s: error running; [removing node]", rt->exec);
       tractorbeam_monitor_delete(mh);
     }
 
