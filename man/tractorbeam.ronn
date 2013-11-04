@@ -4,7 +4,7 @@
 
 ## SYNOPSIS ##
 
-`tractorbeam` [OPTION]... -- [ARGV]...
+`tractorbeam` {send|recv} [OPTION]...
 
 ## DESCRIPTION ##
 
@@ -16,7 +16,8 @@ service. For instance, suppose you have a network service running on
 several different machines. The the following would allow you to
 discover these machines (suppose you run this on every single one):
 
-    tractorbeam --zookeeper my-zk-cluster:2181 \
+    tractorbeam send \
+                --zookeeper my-zk-cluster:2181 \
                 --delay 1 \
                 --path /my/service/$(uuid) \
                 --exec /usr/bin/hostname \
@@ -26,7 +27,45 @@ The above command would execute `hostname` command once a second
 (`--delay` switch) then report the output on node given by the
 `--path` switch.
 
-## OPTIONS ##
+Then you can read this entire tree and write it to a file:
+
+    tractorbeam recv \
+                --zookeeper my-zk-cluster:2181 \
+                --path /my/service
+                --output zookeeper.tree
+
+This would create/update an INI file with the contents of the
+zookeeper cluster.
+
+## RECV MODE ##
+
+### SYNOPSIS ###
+
+`tractorbeam` recv [OPTION]...
+
+### OPTIONS ###
+
+  * `--zookeeper` STRING:
+
+    The zookeeper cluster you want to connect to. You may use comman
+    to provide multiple hosts and optionally define a chroot
+    path (e.g. "zk01:2181,zk02:2182/chroot");
+
+  * `--path` STRING:
+
+    The path of the tree you want to retrieve from zookeeper;
+
+  * `--output` {FILE,-}:
+
+    The file to write contents into. The value `-` means stdout;
+
+## SEND MODE ##
+
+### SYNOPSIS ###
+
+`tractorbeam` send [OPTION]... -- [ARGV]...
+
+### OPTIONS ###
 
   * `--zookeeper` STRING:
 
