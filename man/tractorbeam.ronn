@@ -31,7 +31,7 @@ Then you can read this entire tree and write it to a file:
 
     tractorbeam recv \
                 --zookeeper my-zk-cluster:2181 \
-                --path /my/service
+                --path /my/service \
                 --output zookeeper.tree
 
 This would create/update an INI file with the contents of the
@@ -47,9 +47,9 @@ zookeeper cluster.
 
   * `--zookeeper` STRING:
 
-    The zookeeper cluster you want to connect to. You may use comman
-    to provide multiple hosts and optionally define a chroot
-    path (e.g. "zk01:2181,zk02:2182/chroot");
+    The zookeeper cluster you want to connect to. You may use comma to
+    provide multiple hosts and optionally define a chroot path
+    (e.g. "zk01:2181,zk02:2182/chroot");
 
   * `--path` STRING:
 
@@ -69,9 +69,9 @@ zookeeper cluster.
 
   * `--zookeeper` STRING:
 
-    The zookeeper cluster you want to connect to. You may use comman
-    to provide multiple hosts and optionally define a chroot
-    path (e.g. "zk01:2181,zk02:2182/chroot");
+    The zookeeper cluster you want to connect to. You may use comma to
+    provide multiple hosts and optionally define a chroot path
+    (e.g. "zk01:2181,zk02:2182/chroot");
 
   * `--path` STRING:
 
@@ -97,7 +97,7 @@ zookeeper cluster.
 
     The interval at which the `--exec` program gets invoked (the time
     spent running the process is not taken into account). This value
-    also defines the timeout for the process to terminate.
+    also defines the timeout for the process to terminate;
 
   * `--timeout` MILLISECS:
 
