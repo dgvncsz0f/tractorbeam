@@ -27,35 +27,71 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include "tractorbeam/debug.h"
 #include "tractorbeam/zkrecv.h"
+#include "tractorbeam/helpers.h"
 #include "tractorbeam/monitor.h"
 
 static
-int __tbzkrcv_inicc_raw(tb_snapshot_events event, const char *ppath, const char *name, const void *contents, size_t contsize, void *data)
+int __tbzkrcv_filesystem_cc(tb_snapshot_events event, const char *ppath, const char *name, const void *contents, size_t contsize, void *data)
 {
-  char buffer[22];
+  char *chdir = (char *) data;
+  char *dir   = NULL;
+  char *file  = NULL;
+  FILE *fd    = NULL;
+  int rc      = -1;
   if (event == DONE)
   { return(0); }
   else if (event != ITEM)
   { return(-1); }
 
-  int rc = snprintf(buffer, 22, "%zd\n", contsize);
-  if (rc <= 0)
-  { return(-1); }
-  if (rc >= 22)
+  dir = tbh_join(chdir, "/", ppath, "/", name, NULL);
+  if (dir != NULL)
+  { mkdir(dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH); }
+
+  if (contents == 0)
+  { rc = 0; }
+  else
+  {
+    file = tbh_join(chdir, "/", ppath, "/", name, ".data", NULL);
+    if (file != NULL && (fd = fopen(file, "w")) != NULL)
+    {
+      if (fwrite(contents, sizeof(char), contsize, fd) > 0)
+      { rc = 0; }
+      fclose(fd);
+    }
+    else
+    {
+      TB_DEBUG("could not open file: %s/%s/%s", chdir, ppath, name);
+      rc = -1;
+    }
+  }
+    
+  free(dir);
+  free(file);
+  return(rc);
+}
+
+static
+int __tbzkrcv_file_cc(tb_snapshot_events event, const char *ppath, const char *name, const void *contents, size_t contsize, void *data)
+{
+  FILE *file = (FILE *) data;
+  if (event == DONE)
+  { return(0); }
+  else if (event != ITEM)
   { return(-1); }
 
-  FILE *file = (FILE *) data;
-  if (fwrite(ppath, strlen(ppath), 1, file)>0 && 
-      fwrite("/", 1, 1, file)>0 &&
-      fwrite(name, strlen(name), 1, file)>0 &&
-      fwrite("|", 1, 1, file)>0 &&
-      fwrite(buffer, rc, 1, file)>0 &&
-      fwrite(contents, contsize, 1, file)>0 &&
-      fwrite("\n", 1, 1, file)>0)
-  { return(0); }
-  return(-1);
+  if (contsize > 0)
+  {
+    if (fprintf(file, "%s/%s|%zd\n", ppath, name, contsize) > 0 &&
+        fwrite(contents, sizeof(char), contsize, file) > 0 &&
+        fprintf(file, "\n") > 0)
+    { return(0); }
+    return(-1);
+  }
+
+  return(0);
 }
 
 int tractorbeam_zkrecv(tractorbeam_zkrecv_t *info)
@@ -67,7 +103,28 @@ int tractorbeam_zkrecv(tractorbeam_zkrecv_t *info)
     return(-1);
   }
 
-  int rc  = tractorbeam_monitor_snapshot(mh, info->path, __tbzkrcv_inicc_raw, info->file);
+  int rc = -1;
+  if (info->layout == ZKRECV_LAYOUT_FILE)
+  {
+    int dash   = strcmp(info->output, "-");
+    FILE *file = (dash == 0) ? stdout : fopen(info->output, "w");
+    if (file != NULL)
+    {
+      rc = tractorbeam_monitor_snapshot(mh, info->path, __tbzkrcv_file_cc, file);
+      if (dash != 0)
+      { fclose(file); }
+    }
+    else
+    {
+      rc = -1;
+      TB_DEBUG("could not open file: %s", info->output);
+    }
+  }
+  else if (info->layout == ZKRECV_LAYOUT_FILESYSTEM)
+  {
+    mkdir(info->output, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    rc = tractorbeam_monitor_snapshot(mh, info->path, __tbzkrcv_filesystem_cc, info->output);
+  }
   tractorbeam_monitor_term(mh);
   return(rc);
 }

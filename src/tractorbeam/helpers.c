@@ -27,8 +27,10 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
+#include "tractorbeam/debug.h"
 
-char *strdup(const char *s)
+char *tbh_strdup(const char *s)
 {
   size_t len = strlen(s);
   char *r    = (char *) malloc(sizeof(char) * (len + 1));
@@ -36,4 +38,36 @@ char *strdup(const char *s)
   { strncpy(r, s, len); }
   r[len] = '\0';
   return(r);
+}
+
+char *tbh_join(const char *base, ...)
+{
+  size_t pathlen   = strlen(base);
+  size_t offset    = pathlen;
+  char *path       = NULL;
+  const char *item = NULL;
+
+  va_list args;
+  va_start(args, base);
+  while ((item = va_arg(args, const char *)) != NULL)
+  { pathlen += strlen(item); }
+  va_end(args);
+
+  path = (char *) malloc(pathlen + 1);
+  if (path == NULL)
+  { return(NULL); }
+
+  va_start(args, base);
+  strcpy(path, base);
+  while ((item = va_arg(args, char*)) != NULL)
+  {
+    if (strcmp(item, "") == 0)
+    { continue; }
+    strcpy(path+offset, item);
+    offset += strlen(item);
+  }
+  path[offset] = '\0';
+  va_end(args);
+
+  return(path);
 }

@@ -30,13 +30,20 @@
 
 #include "tractorbeam/monitor.h"
 
+typedef enum
+{
+  ZKRECV_LAYOUT_FILE,
+  ZKRECV_LAYOUT_FILESYSTEM
+} tb_zkrecv_layout_e;
+
 typedef struct
 {
   char *endpoint;
   char *path;
-  FILE *file;
+  char *output;
   int delay;
   int timeout;
+  tb_zkrecv_layout_e layout;
 } tractorbeam_zkrecv_t;
 
 /*! Reads a tree from zookeeper

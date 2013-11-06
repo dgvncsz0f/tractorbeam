@@ -108,7 +108,7 @@ size_t __tractorbeam_strlen1(const char *s)
 static
 void __printf_indent(const char *a, const char *b, size_t maxlen)
 {
-  char *tmp     = strdup(b);
+  char *tmp     = tbh_strdup(b);
   char *delim   = " ";
   char *token   = NULL;
   size_t prefix = __tractorbeam_strlen1(a);
@@ -183,13 +183,17 @@ void __tractorbeam_print_recvusage(const char *prg)
                       "  different formats.", 60);
 
   snprintf(buffer, 1024, "The zookeeper cluster to connect to [default:%s];", TB_DEFAULT_ENDPOINT);
-  __printf_indent("  --zookeeper STRING  ", buffer, 76);
+  __printf_indent("  --zookeeper STRING         ", buffer, 76);
 
   snprintf(buffer, 1024, "The tree you want to read;");
-  __printf_indent("  --path STRING       ", buffer, 76);
+  __printf_indent("  --path STRING              ", buffer, 76);
 
   snprintf(buffer, 1024, "The file to write the contents. Use - to write into the stdout [default:-];");
-  __printf_indent("  --output FILE       ", buffer, 76);
+  __printf_indent("  --output FILE              ", buffer, 76);
+
+  snprintf(buffer, 1024, "The layout to use when dumping the zookeeper tree. `filesystem' uses"
+                         " files and directories and `file' uses a single file [default:file];\n");
+  __printf_indent("  --layout {filesystem,file} ", buffer, 76);
 }
 
 static
@@ -199,6 +203,7 @@ int __tractorbeam_parse_recvopts(int argc, char *argv[], tractorbeam_zkrecv_t *r
     {"zookeeper",     required_argument, NULL, 0 },
     {"path",          required_argument, NULL, 0 },
     {"output",        required_argument, NULL, 0 },
+    {"layout",        required_argument, NULL, 0 },
     {"help",          no_argument,       NULL, 0 },
     {0,               0,                 NULL, 0 }
   };
@@ -216,11 +221,18 @@ int __tractorbeam_parse_recvopts(int argc, char *argv[], tractorbeam_zkrecv_t *r
       else if (opt == 1)
       { recvcfg->path = optarg; }
       else if (opt == 2)
+      { recvcfg->output = optarg; }
+      else if (opt == 3)
       {
-        if (strcmp(optarg, "-") == 0)
-        { recvcfg->file = stdout; }
+        if (strcmp("file", optarg) == 0)
+        { recvcfg->layout = ZKRECV_LAYOUT_FILE; }
+        else if (strcmp("filesystem", optarg) == 0)
+        { recvcfg->layout = ZKRECV_LAYOUT_FILESYSTEM; }
         else
-        { recvcfg->file = fopen(optarg, "w"); }
+        {
+          printf("ERROR: invalid layout\n");
+          return(-1);
+        }
       }
       else
       { return(-1); }
@@ -293,7 +305,8 @@ int main(int argc, char *argv[])
   tractorbeam_zkrecv_t recvcfg;
   recvcfg.endpoint  = TB_DEFAULT_ENDPOINT;
   recvcfg.path      = "";
-  recvcfg.file      = stdout;
+  recvcfg.output    = "";
+  recvcfg.layout    = ZKRECV_LAYOUT_FILE;
   recvcfg.delay     = TB_DEFAULT_DELAY;
   recvcfg.timeout   = TB_DEFAULT_TIMEOUT;
 
@@ -303,7 +316,7 @@ int main(int argc, char *argv[])
     return(-1);
   }
 
-  if (strcmp(argv[1], "send") == 0)
+  if (strcmp("send", argv[1]) == 0)
   {
     argv[1] = argv[0];
     if (__tractorbeam_parse_sendopts(argc-1, argv+1, &sendcfg) != 0)
@@ -316,7 +329,7 @@ int main(int argc, char *argv[])
     free(sendcfg.argv);
     return(rc);
   }
-  else if (strcmp(argv[1], "recv") == 0)
+  else if (strcmp("recv", argv[1]) == 0)
   {
     argv[1] = argv[0];
     if (__tractorbeam_parse_recvopts(argc-1, argv+1, &recvcfg) != 0)

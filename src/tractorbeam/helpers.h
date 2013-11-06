@@ -30,6 +30,8 @@
 
 #define UNUSED(v) ((void) v)
 
-char *strdup(const char *);
+char *tbh_strdup(const char *);
+
+char *tbh_join(const char *, ...);
 
 #endif

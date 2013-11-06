@@ -25,6 +25,7 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include <libgen.h>
 #include <string.h>
 #include <pthread.h>
 #include <zookeeper/zookeeper.h>
@@ -40,29 +41,6 @@ struct tractorbeam_monitor_t
   char *endpoint;
   pthread_mutex_t mutex;
 };
-
-static
-char *__tbm_path(const char *parent, const char *name)
-{
-  size_t offset = strlen(parent);
-  size_t psize  = offset + 1 + strlen(name);
-  char *path = (char *) malloc(psize + 1);
-  if (path != NULL)
-  {
-    strncpy(path, parent, offset);
-    if (psize > offset+1)
-    {
-      strncpy(path+offset, "/", 1);
-      strcpy(path+offset+1, name);
-      path[psize] = '\0';
-    }
-    else
-    { path[offset] = '\0'; }
-  }
-  TB_DEBUG("%s+%s => %s", parent, name, path);
-
-  return(path);
-}
 
 static
 void __tbm_reconnect(tractorbeam_monitor_t *mh, watcher_fn fn)
@@ -141,10 +119,12 @@ int __tbm_snapshot(tractorbeam_monitor_t *mh, const char *ppath, const char *nam
 {
   struct String_vector children;
   int rc, zrc;
-  char *path = __tbm_path(ppath, name);
+  int r_bufsize = (int) bufsize;
+  char *path    = tbh_join(ppath, "/", name, NULL);
   if (path == NULL)
   { return(-1); }
 
+  TB_DEBUG("__tbm_snapshot: %s,%s => %s", ppath, name, path);
   rc  = -1;
   zrc = zoo_get_children(mh->zh, path, 0, &children);
   if (zrc != ZOK)
@@ -153,26 +133,20 @@ int __tbm_snapshot(tractorbeam_monitor_t *mh, const char *ppath, const char *nam
     goto handle_error;
   }
 
-  for (int k=0; k<children.count; k+=1)
+  rc  = -1;
+  zrc = zoo_get(mh->zh, path, 0, buffer, &r_bufsize, NULL);
+  if (zrc != ZOK)
   {
-    rc            = -1;
-    char *child   = __tbm_path(path, children.data[k]);
-    int r_bufsize = (int) bufsize;
-    int zrc       = zoo_get(mh->zh, child, 0, buffer, &r_bufsize, NULL);
-    free(child);
-    if (zrc != ZOK)
-    {
-      TB_DEBUG("error retrieving contents of: %s/%s", path, children.data[k]);
-      goto handle_error;
-    }
+    TB_DEBUG("error retrieving contents of: %s/%s", ppath, name);
+    goto handle_error;
+  }
 
-    rc      = -2;
-    *status = callback(ITEM, path, children.data[k], buffer, (size_t) r_bufsize, data);
-    if (*status != 0)
-    {
-      TB_DEBUG("callback has failed: %s/%s/%d", path, children.data[k], *status);
-      goto handle_error;
-    }
+  rc      = -2;
+  *status = callback(ITEM, ppath, name, buffer, (size_t) r_bufsize, data);
+  if (*status != 0)
+  {
+    TB_DEBUG("callback has failed: %s/%s/%d", ppath, name, *status);
+    goto handle_error;
   }
 
   for (int k=0; k<children.count; k+=1)
@@ -207,11 +181,11 @@ tractorbeam_monitor_t *tractorbeam_monitor_init(const char *endpoint, const char
     return(NULL);
   }
 
-  mh->znode = strdup(znode);
+  mh->znode = tbh_strdup(znode);
   if (mh->znode == NULL)
   { goto handle_error; }
 
-  mh->endpoint = strdup(endpoint);
+  mh->endpoint = tbh_strdup(endpoint);
   if (mh->endpoint == NULL)
   { goto handle_error; }
 
@@ -259,12 +233,28 @@ int tractorbeam_monitor_snapshot(tractorbeam_monitor_t *mh, const char *path, tb
   { return(-1); }
 
   int status;
-  char buffer[1048576];
-  int rc = __tbm_snapshot(mh, path, "", &status, buffer, 1048576, callback, data);
+  char *buffer = (char *) malloc(1048576);
+  char *path1  = tbh_strdup(path);
+  char *path2  = tbh_strdup(path);
+  char *ppath  = (path1 == NULL) ? NULL : dirname(path1);
+  char *name   = (path2 == NULL) ? NULL : basename(path2);
+  int rc       = -1;
+
+  if (ppath != NULL && name != NULL && buffer != NULL)
+  {
+    if (strcmp(ppath, "/") == 0)
+    { rc = __tbm_snapshot(mh, "", name, &status, buffer, 1048576, callback, data); }
+    else
+    { rc = __tbm_snapshot(mh, ppath, name, &status, buffer, 1048576, callback, data); }
+  }
   if (rc == 0)
   { status = callback(DONE, path, "", NULL, 0, data); }
   else if (rc == -1)
   { status = callback(FAIL, path, "", NULL, 0, data); }
+
+  free(buffer);
+  free(path1);
+  free(path2);
 
   pthread_mutex_unlock(&mh->mutex);
   return(status);
