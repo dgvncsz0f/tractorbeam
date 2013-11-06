@@ -55,10 +55,44 @@ zookeeper cluster.
 
     The path of the tree you want to retrieve from zookeeper;
 
-  * `--output` {FILE,-}:
+  * `--output` {PATH}:
 
-    The file to write contents into. The value `-` means stdout;
+    The file to write contents into (layout=file) or the directory to
+    create the zk tree (layout=filesystem). The value `-` means
+    stdout when using layout=file;
 
+  * `--layout` {filesystem,file}:
+
+    The layout to use when reading the zookeeper tree.
+
+    The `filesystem` layout uses files and directories. For instance:
+
+        zkCli $ create /foo foo
+        zkCli $ create /foo/bar foobar
+        $ tractorbeam --layout filesystem --path /foo --output /tmp/zk
+        $ find /tmp/zk
+        /tmp/zk
+        /tmp/zk/foo
+        /tmp/zk/foo.data      # <- contents of /foo
+        /tmp/zk/foo/bar
+        /tmp/zk/foo/bar.data  # <- contents of /foo/bar
+
+    The `file` layout creates a single file, using the following format:
+
+        zkCli $ create /foo foo
+        zkCli $ create /foo/bar foobar
+        $ tractorbeam --layout file --path /foo --output /tmp/zk.data
+        $ cat /tmp/zk.data
+        /foo|3
+        foo
+        /foo/bar|6
+        foobar
+
+     The format of this file is as follows:
+
+        <PATH> "|" <SIZE> "\n"
+        <CONTENTS> "\n"
+       
 ## SEND MODE ##
 
 ### SYNOPSIS ###

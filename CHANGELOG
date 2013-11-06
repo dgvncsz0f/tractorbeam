@@ -1,5 +1,8 @@
 -*- mode: text; -*-
 
+v1.1.0 | 2013-11-06
+  * recv filesystem layout | dgvncsz0f
+
 v1.0.0 | 2013-11-04
   * creating recv mode (reading zookeeper tree) | dgvncsz0f
   * major: cli interface has changed: adding subcommands | dgvncsz0f
