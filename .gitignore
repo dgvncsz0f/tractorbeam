@@ -1,19 +1,10 @@
 # Object files
 *.o
-*.ko
-
-# Libraries
-*.lib
-*.a
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
+/man/ronn
 /tractorbeam
+/debian/files
+/debian/tractorbeam
+/debian/*.substvars
+/debian/*.debhelper
+/man/tractorbeam.1
+/debian/*.debhelper.log

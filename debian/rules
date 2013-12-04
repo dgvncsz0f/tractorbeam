@@ -1,0 +1,17 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+bin_gem ?= gem
+
+%:
+	dh $@
+
+override_dh_auto_clean:
+	dh_clean
+	rm -r -f man/ronn
+	$(MAKE) clean
+
+override_dh_auto_build:
+	dh_testdir
+	$(bin_gem) install -i man/ronn ronn
+	$(MAKE) tractorbeam manpages GEM_HOME=man/ronn bin_ronn=man/ronn/bin/ronn
